@@ -67,5 +67,5 @@ aws --region us-west-1 ecs run-task --cluster fargate-invoicefiles-processqueue-
 
 ### run task directly from terminal with filename
 ```
-aws --region us-west-1 ecs run-task --cluster fargate-invoicefiles-processqueue-cluster --task-definition fargate-invoicefiles-processqueue-task --count 1 --launch-type FARGATE --network-configuration 'awsvpcConfiguration={subnets=[subnet-0e481b9e0173c9528,subnet-019ac445c965c6a22],securityGroups=[sg-00c1682ca200e79ac]}' --overrides '{ "containerOverrides": [ { "name": "fargate-invoicefiles-processqueue-container", "environment": [ { "name": "filename", "value": "37000-00.xlsx" } ] } ] }'
+aws --region us-west-1 ecs run-task --cluster fargate-invoicefiles-processqueue-cluster --task-definition fargate-invoicefiles-processqueue-task --count 1 --launch-type FARGATE --network-configuration 'awsvpcConfiguration={subnets=[subnet-0e481b9e0173c9528,subnet-019ac445c965c6a22],securityGroups=[sg-00c1682ca200e79ac]}' --overrides '{ "containerOverrides": [ { "name": "fargate-invoicefiles-processqueue-container", "environment": [ { "name": "filename", "value": "005020.xlsx" } ] } ] }'
 ```

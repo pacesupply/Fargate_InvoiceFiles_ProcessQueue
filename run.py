@@ -313,20 +313,20 @@ def process_file(my_File, outgoing_url):
         df = pd.DataFrame(data, columns=['ERROR'])
 
     if 'INVOICE_DATE' in df:
-        df['INVOICE_DATE'] = pd.to_datetime(df['INVOICE_DATE'],infer_datetime_format=False, format='%m/%d/%Y', errors='ignore')
+        df['INVOICE_DATE'] = pd.to_datetime(df['INVOICE_DATE'],infer_datetime_format=False, format='%m/%d/%y', errors='ignore').dt.date
     if 'REQPAY_DATE' in df:
-        df['REQPAY_DATE'] = pd.to_datetime(df['REQPAY_DATE'],infer_datetime_format=False, format='%m/%d/%Y', errors='ignore')
+        df['REQPAY_DATE'] = pd.to_datetime(df['REQPAY_DATE'],infer_datetime_format=False, format='%m/%d/%y', errors='ignore').dt.date
     if 'RECIEVED_DATE' in df:
-        df['RECIEVED_DATE'] = pd.to_datetime(df['RECIEVED_DATE'],infer_datetime_format=False, format='%m/%d/%Y', errors='ignore')
+        df['RECIEVED_DATE'] = pd.to_datetime(df['RECIEVED_DATE'],infer_datetime_format=False, format='%m/%d/%y', errors='ignore').dt.date
     if 'PO_DATE' in df:
-        df['PO_DATE'] = pd.to_datetime(df['PO_DATE'],infer_datetime_format=False, format='%m/%d/%Y', errors='ignore')
+        df['PO_DATE'] = pd.to_datetime(df['PO_DATE'],infer_datetime_format=False, format='%m/%d/%y', errors='ignore').dt.date
     if 'DATE_RECEIVED' in df:
-        df['DATE_RECEIVED'] = pd.to_datetime(df['DATE_RECEIVED'],infer_datetime_format=False, format='%m/%d/%Y', errors='ignore')
+        df['DATE_RECEIVED'] = pd.to_datetime(df['DATE_RECEIVED'],infer_datetime_format=False, format='%m/%d/%y', errors='ignore').dt.date
     if 'REQDATE' in df:
-        df['REQDATE'] = pd.to_datetime(df['REQDATE'],infer_datetime_format=False, format='%m/%d/%Y', errors='ignore')
+        df['REQDATE'] = pd.to_datetime(df['REQDATE'],infer_datetime_format=False, format='%m/%d/%y', errors='ignore').dt.date
 
-    # print("\n ********************* OUTGOING ********************* ")
-    # print(df.to_string())
+    print("\n ********************* OUTGOING ********************* ")
+    print(df.to_string())
 
     spapi.put_dataframe_to_file(df, outgoing_url, customer + ".xlsx")
 
