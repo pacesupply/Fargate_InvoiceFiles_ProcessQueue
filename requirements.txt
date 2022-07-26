@@ -1,0 +1,8 @@
+wheel
+Office365-REST-Python-Client
+pandas
+openpyxl
+requests
+xmltodict
+numpy
+boto3
