@@ -1,12 +1,10 @@
 import boto3
 import io
 import pandas as pd
-import numpy as np
 import os
 import requests
 import json
 import urllib
-import html
 
 from office365.sharepoint.client_context import ClientContext
 from office365.sharepoint.files.file import File
@@ -63,7 +61,7 @@ class sharepoint:
         bytes_file_obj = io.BytesIO()
         bytes_file_obj.write(response.content)
         bytes_file_obj.seek(0)  # set file object to start
-        return pd.read_excel(bytes_file_obj,converters=converters)
+        return pd.read_excel(bytes_file_obj, converters=converters)
 
     def put_dataframe_to_file(self, df, path, filename):
         try:
@@ -325,8 +323,8 @@ def process_file(my_File, outgoing_url):
     if 'REQDATE' in df:
         df['REQDATE'] = pd.to_datetime(df['REQDATE'],infer_datetime_format=False, format='%m/%d/%y', errors='ignore').dt.date
 
-    print("\n ********************* OUTGOING ********************* ")
-    print(df.to_string())
+    # print("\n ********************* OUTGOING ********************* ")
+    # print(df.to_string())
 
     spapi.put_dataframe_to_file(df, outgoing_url, customer + ".xlsx")
 
