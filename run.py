@@ -1,6 +1,7 @@
 import boto3
 import io
 import pandas as pd
+import numpy as np
 import os
 import requests
 import json
@@ -183,7 +184,8 @@ def process_file(my_File, outgoing_url):
                                              converters={
                                                  'InvoiceNumber': str,
                                                  'INVOICENUMBER': str,
-                                                 'PO_NUMBER': str})
+                                                 'PO_NUMBER': str,
+                                                 'PONUMBER': str})
             # remove duplicate rows based on PACEID
             df.columns = df.columns.str.upper()
             df = df.drop_duplicates(subset='INVOICENUMBER', keep="last")
@@ -203,27 +205,29 @@ def process_file(my_File, outgoing_url):
                 data = misa.getvoucher(row['INVOICENUMBER'], customer)
 
                 df.at[index, 'VENDOR_NUMBER'] = data['vendorno']
-                df.at[index, 'ON_STATEMENT'] = True
-                df.at[index, 'ON_RECEIVING_NOT_INOVICED'] = False
-                df.at[index, 'ON_VOUCHER_NOCHECK'] = False
+                df.at[index, 'ON_STATEMENT'] = "Yes"
+                df.at[index, 'UNBILLED_RECEIVING'] = "No"
+                df.at[index, 'LOADED_NOT_PAID'] = "No"
+                df.at[index, 'CHECK_NUMBER'] = data['checknumber']
+                df.at[index, 'CHECK_DATE'] = data['checkdate']
+                df.at[index, 'ANTICIPATED_CHECK_DATE'] = data['anticipatedcheckdate']
                 df.at[index, 'VENDOR_NAME'] = data['vendorname']
                 df.at[index, 'INVOICE_DATE'] = data['invoicedate']
                 df.at[index, 'INVOICE_AMOUNT'] = data['invoiceamount']
                 df.at[index, 'MONTH_YEAR'] = data['monthyear']
                 df.at[index, 'DATE_RECEIVED'] = data['datereceived']
-                df.at[index, 'CHECK_NUMBER'] = data['checknumber']
-                df.at[index, 'CHECK_DATE'] = data['checkdate']
                 df.at[index, 'DISCOUNT'] = data['discount']
                 df.at[index, 'REQPAY_DATE'] = data['reqpaydate']
-                df.at[index, 'PO_NUMBER'] = data['ponumber']
-                df.at[index, 'ROW_UPDATED_TIME'] = datetime.utcnow()
+                df.at[index, 'RECEIVING_PO'] = data['ponumber']
+                df.at[index, 'BATCH_NUMBER'] = data['batchnumber']
+                # df.at[index, 'ROW_UPDATED_TIME'] = datetime.utcnow()
 
             except:
-                df.at[index, 'ROW_UPDATED_TIME'] = datetime.utcnow()
-                df.at[index, 'NOTES'] = 'INVIOCE NOT FOUND'
-                df.at[index, 'ON_STATEMENT'] = True
-                df.at[index, 'ON_RECEIVING_NOT_INOVICED'] = False
-                df.at[index, 'ON_VOUCHER_NOCHECK'] = False
+                # df.at[index, 'ROW_UPDATED_TIME'] = datetime.utcnow()
+                df.at[index, 'NOTES'] = 'INVOICE NOT FOUND'
+                df.at[index, 'ON_STATEMENT'] = "Yes"
+                df.at[index, 'UNBILLED_RECEIVING'] = "No"
+                df.at[index, 'LOADED_NOT_PAID'] = "No"
 
         #see if prices of changed
         #df = add_price_match(df, outgoing_url, customer, spapi)
@@ -243,6 +247,7 @@ def process_file(my_File, outgoing_url):
             try:
                 # print(po)
                 df.at[loc, 'PO_NUMBER'] = po['Id']
+                df.at[loc, 'RECEIVING_PO'] = po['Id']
                 df.at[loc, 'PO_DATE'] = po['podate']
                 if po['invoice']:
                     df.at[loc, 'INVOICENUMBER'] = po['invoice']
@@ -251,19 +256,19 @@ def process_file(my_File, outgoing_url):
                 df.at[loc, 'RECIEVED_DATE'] = po['recdate']
                 df.at[loc, 'RECEIVED_AMOUNT'] = po['receivedamount']
                 df.at[loc, 'TOTITEMS_RECEIVED'] = po['totitemsreceived']
-                df.at[loc, 'ROW_UPDATED_TIME'] = datetime.utcnow()
-                df.at[loc, 'ON_RECEIVING_NOT_INOVICED'] = True
+                # df.at[loc, 'ROW_UPDATED_TIME'] = datetime.utcnow()
+                df.at[loc, 'UNBILLED_RECEIVING'] = "Yes"
                 if (loc == index):
-                    df.at[loc, 'ON_STATEMENT'] = False
-                    df.at[loc, 'ON_VOUCHER_NOCHECK'] = False
+                    df.at[loc, 'ON_STATEMENT'] = "No"
+                    df.at[loc, 'LOADED_NOT_PAID'] = "No"
 
             except:
-                df.at[loc, 'ROW_UPDATED_TIME'] = datetime.utcnow()
+                # df.at[loc, 'ROW_UPDATED_TIME'] = datetime.utcnow()
                 df.at[loc, 'NOTES'] = 'UNKNOWN ERROR'
-                df.at[loc, 'ON_RECEIVING_NOT_INOVICED'] = True
+                df.at[loc, 'UNBILLED_RECEIVING'] = "Yes"
                 if (loc == index):
-                    df.at[loc, 'ON_STATEMENT'] = False
-                    df.at[loc, 'ON_VOUCHER_NOCHECK'] = False
+                    df.at[loc, 'ON_STATEMENT'] = "No"
+                    df.at[loc, 'LOADED_NOT_PAID'] = "No"
 
         # vouchers with no checks
         vouchers = misa.getvouchers_nocheck(customer)
@@ -285,6 +290,8 @@ def process_file(my_File, outgoing_url):
                     df.at[loc, 'PO_NUMBER'] = voucher['ponumber']
                 if voucher['Id']:
                     df.at[loc, 'INVOICENUMBER'] = voucher['Id']
+                df.at[loc, 'ANTICIPATED_CHECK_DATE'] = voucher['anticipatedcheckdate']
+                df.at[loc, 'RECEIVING_PO'] =  voucher['ponumber']
                 df.at[loc, 'VENDOR_NUMBER'] = voucher['vendorno']
                 df.at[loc, 'VENDOR_NAME'] = voucher['vendorname']
                 df.at[loc, 'INVOICE_DATE'] = voucher['invoicedate']
@@ -293,35 +300,76 @@ def process_file(my_File, outgoing_url):
                 df.at[loc, 'DATE_RECEIVED'] = voucher['datereceived']
                 df.at[loc, 'DISCOUNT'] = voucher['discount']
                 df.at[loc, 'REQPAY_DATE'] = voucher['reqpaydate']
-                df.at[loc, 'ROW_UPDATED_TIME'] = datetime.utcnow()
-                df.at[loc, 'ON_VOUCHER_NOCHECK'] = True
+                df.at[loc, 'BATCH_NUMBER'] = voucher['batchnumber']
+                # df.at[loc, 'ROW_UPDATED_TIME'] = datetime.utcnow()
+                df.at[loc, 'LOADED_NOT_PAID'] = "Yes"
                 if (loc == index):
-                    df.at[loc, 'ON_RECEIVING_NOT_INOVICED'] = False
-                    df.at[loc, 'ON_STATEMENT'] = False
+                    df.at[loc, 'UNBILLED_RECEIVING'] = "No"
+                    df.at[loc, 'ON_STATEMENT'] = "No"
             except:
-                df.at[loc, 'ROW_UPDATED_TIME'] = datetime.utcnow()
+                # df.at[loc, 'ROW_UPDATED_TIME'] = datetime.utcnow()
                 df.at[loc, 'NOTES'] = 'UNKNOWN ERROR'
-                df.at[loc, 'ON_VOUCHER_NOCHECK'] = True
+                df.at[loc, 'LOADED_NOT_PAID'] = "Yes"
                 if (loc == index):
-                    df.at[loc, 'ON_RECEIVING_NOT_INOVICED'] = False
-                    df.at[loc, 'ON_STATEMENT'] = False
+                    df.at[loc, 'UNBILLED_RECEIVING'] = "No"
+                    df.at[loc, 'ON_STATEMENT'] = "No"
 
     else:
         data = ["INVALID CUSTOMER NAME"]
         df = pd.DataFrame(data, columns=['ERROR'])
 
-    if 'INVOICE_DATE' in df:
-        df['INVOICE_DATE'] = pd.to_datetime(df['INVOICE_DATE'],infer_datetime_format=False, format='%m/%d/%y', errors='ignore').dt.date
-    if 'REQPAY_DATE' in df:
-        df['REQPAY_DATE'] = pd.to_datetime(df['REQPAY_DATE'],infer_datetime_format=False, format='%m/%d/%y', errors='ignore').dt.date
-    if 'RECIEVED_DATE' in df:
-        df['RECIEVED_DATE'] = pd.to_datetime(df['RECIEVED_DATE'],infer_datetime_format=False, format='%m/%d/%y', errors='ignore').dt.date
-    if 'PO_DATE' in df:
-        df['PO_DATE'] = pd.to_datetime(df['PO_DATE'],infer_datetime_format=False, format='%m/%d/%y', errors='ignore').dt.date
-    if 'DATE_RECEIVED' in df:
-        df['DATE_RECEIVED'] = pd.to_datetime(df['DATE_RECEIVED'],infer_datetime_format=False, format='%m/%d/%y', errors='ignore').dt.date
-    if 'REQDATE' in df:
-        df['REQDATE'] = pd.to_datetime(df['REQDATE'],infer_datetime_format=False, format='%m/%d/%y', errors='ignore').dt.date
+
+    df = df.replace(r'^\s*$', np.nan, regex=True)
+
+    # print("\n ********************* OUTGOING ********************* ")
+    # print(df.to_string())
+    try:
+        if 'INVOICE_DATE' in df:
+            df['INVOICE_DATE'] = pd.to_datetime(df['INVOICE_DATE'],infer_datetime_format=False, format='%m/%d/%y', errors='ignore').dt.date
+    except:
+        pass
+
+    try:
+        if 'REQPAY_DATE' in df:
+            df['REQPAY_DATE'] = pd.to_datetime(df['REQPAY_DATE'],infer_datetime_format=False, format='%m/%d/%y', errors='ignore').dt.date
+    except:
+        pass
+
+    try:
+        if 'RECIEVED_DATE' in df:
+            df['RECIEVED_DATE'] = pd.to_datetime(df['RECIEVED_DATE'],infer_datetime_format=False, format='%m/%d/%y', errors='ignore').dt.date
+    except:
+        pass
+
+    try:
+        if 'PO_DATE' in df:
+            df['PO_DATE'] = pd.to_datetime(df['PO_DATE'],infer_datetime_format=False, format='%m/%d/%y', errors='ignore').dt.date
+    except:
+        pass
+
+    try:
+        if 'DATE_RECEIVED' in df:
+            df['DATE_RECEIVED'] = pd.to_datetime(df['DATE_RECEIVED'],infer_datetime_format=False, format='%m/%d/%y', errors='ignore').dt.date
+    except:
+        pass
+
+    try:
+        if 'REQDATE' in df:
+            df['REQDATE'] = pd.to_datetime(df['REQDATE'],infer_datetime_format=False, format='%m/%d/%y', errors='ignore').dt.date
+    except:
+        pass
+
+    try:
+        if 'CHECK_DATE' in df:
+            df['CHECK_DATE'] = pd.to_datetime(df['CHECK_DATE'],infer_datetime_format=False, format='%m/%d/%y', errors='ignore').dt.date
+    except:
+        pass
+    
+    try:
+        if 'ANTICIPATED_CHECK_DATE' in df:
+            df['ANTICIPATED_CHECK_DATE'] = pd.to_datetime(df['ANTICIPATED_CHECK_DATE'],infer_datetime_format=False, format='%m/%d/%y', errors='ignore').dt.date
+    except:
+        pass
 
     # print("\n ********************* OUTGOING ********************* ")
     # print(df.to_string())
