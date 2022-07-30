@@ -6,6 +6,7 @@ import os
 import requests
 import json
 import urllib
+import xlsxwriter
 
 from office365.sharepoint.client_context import ClientContext
 from office365.sharepoint.files.file import File
@@ -68,6 +69,44 @@ class sharepoint:
         try:
             bytes_file_obj = io.BytesIO()
             df.to_excel(bytes_file_obj, index=False)
+            bytes_file_obj.seek(0)
+
+            sp_folder = self.get_creds().web.get_folder_by_server_relative_url(path)
+            sp_folder.upload_file(filename, bytes_file_obj).execute_query()
+        except:
+            print("Error uploadig file {}".format(filename))
+
+    def put_dataframe_to_file_formated(self, df, path, filename):
+        try:
+
+            bytes_file_obj = io.BytesIO()
+            # df.to_excel(bytes_file_obj, index=False)
+            writer = pd.ExcelWriter(bytes_file_obj, engine='xlsxwriter')
+
+            df.to_excel(writer, sheet_name='Sheet1', index=False)
+
+            workbook = writer.book
+            worksheet = writer.sheets['Sheet1']
+            format = workbook.add_format({'text_wrap': True,
+                                          'bold': True,
+                                          'valign': 'top',
+                                          'align': 'center'})
+
+            # worksheet.set_row(0, None, format)
+
+            worksheet.set_row(0, 35, format)
+
+            for col_num, value in enumerate(df.columns.values):
+                worksheet.write(0, col_num, value, format)
+
+            for column in df:
+                column_length = max(df[column].astype(str).map(len).max(), len(column))
+                col_idx = df.columns.get_loc(column)
+                writer.sheets['Sheet1'].set_column(col_idx, col_idx, column_length+2)
+
+            worksheet.freeze_panes(1, 0)
+            writer.save()
+
             bytes_file_obj.seek(0)
 
             sp_folder = self.get_creds().web.get_folder_by_server_relative_url(path)
@@ -193,7 +232,7 @@ def process_file(my_File, outgoing_url):
         except:
             data = ["INVALID FILE FORMAT"]
             df = pd.DataFrame(data, columns=['ERROR'])
-            spapi.put_dataframe_to_file(df, outgoing_url, customer + ".xlsx")
+            spapi.put_dataframe_to_file_formated(df, outgoing_url, customer + ".xlsx")
 
         # print("\n\n *********** INCOMING ({}) ************** ".format(os.path.basename(my_File)))
         # print(df.to_string())
@@ -204,30 +243,30 @@ def process_file(my_File, outgoing_url):
             try:
                 data = misa.getvoucher(row['INVOICENUMBER'], customer)
 
-                df.at[index, 'VENDOR_NUMBER'] = data['vendorno']
-                df.at[index, 'ON_STATEMENT'] = "Yes"
-                df.at[index, 'UNBILLED_RECEIVING'] = "No"
-                df.at[index, 'LOADED_NOT_PAID'] = "No"
-                df.at[index, 'CHECK_NUMBER'] = data['checknumber']
-                df.at[index, 'CHECK_DATE'] = data['checkdate']
-                df.at[index, 'ANTICIPATED_CHECK_DATE'] = data['anticipatedcheckdate']
-                df.at[index, 'VENDOR_NAME'] = data['vendorname']
-                df.at[index, 'INVOICE_DATE'] = data['invoicedate']
-                df.at[index, 'INVOICE_AMOUNT'] = data['invoiceamount']
-                df.at[index, 'MONTH_YEAR'] = data['monthyear']
-                df.at[index, 'DATE_RECEIVED'] = data['datereceived']
+                df.at[index, 'VENDOR NUMBER'] = data['vendorno']
+                df.at[index, 'ON STATEMENT'] = "Yes"
+                df.at[index, 'UNBILLED RECEIVING'] = "No"
+                df.at[index, 'LOADED NOT PAID'] = "No"
+                df.at[index, 'CHECK NUMBER'] = data['checknumber']
+                df.at[index, 'CHECK DATE'] = data['checkdate']
+                df.at[index, 'ANTICIPATED CHECK DATE'] = data['anticipatedcheckdate']
+                df.at[index, 'VENDOR NAME'] = data['vendorname']
+                df.at[index, 'INVOICE DATE'] = data['invoicedate']
+                df.at[index, 'INVOICE AMOUNT'] = data['invoiceamount']
+                df.at[index, 'MONTH YEAR'] = data['monthyear']
+                df.at[index, 'DATE RECEIVED'] = data['datereceived']
                 df.at[index, 'DISCOUNT'] = data['discount']
-                df.at[index, 'REQPAY_DATE'] = data['reqpaydate']
-                df.at[index, 'RECEIVING_PO'] = data['ponumber']
-                df.at[index, 'BATCH_NUMBER'] = data['batchnumber']
+                df.at[index, 'REQPAY DATE'] = data['reqpaydate']
+                df.at[index, 'RECEIVING PO'] = data['ponumber']
+                df.at[index, 'BATCH NUMBER'] = data['batchnumber']
                 # df.at[index, 'ROW_UPDATED_TIME'] = datetime.utcnow()
 
             except:
                 # df.at[index, 'ROW_UPDATED_TIME'] = datetime.utcnow()
                 df.at[index, 'NOTES'] = 'INVOICE NOT FOUND'
-                df.at[index, 'ON_STATEMENT'] = "Yes"
-                df.at[index, 'UNBILLED_RECEIVING'] = "No"
-                df.at[index, 'LOADED_NOT_PAID'] = "No"
+                df.at[index, 'ON STATEMENT'] = "Yes"
+                df.at[index, 'UNBILLED RECEIVING'] = "No"
+                df.at[index, 'LOADED NOT PAID'] = "No"
 
         #see if prices of changed
         #df = add_price_match(df, outgoing_url, customer, spapi)
@@ -247,28 +286,28 @@ def process_file(my_File, outgoing_url):
             try:
                 # print(po)
                 df.at[loc, 'PO_NUMBER'] = po['Id']
-                df.at[loc, 'RECEIVING_PO'] = po['Id']
-                df.at[loc, 'PO_DATE'] = po['podate']
+                df.at[loc, 'RECEIVING PO'] = po['Id']
+                df.at[loc, 'PO DATE'] = po['podate']
                 if po['invoice']:
                     df.at[loc, 'INVOICENUMBER'] = po['invoice']
                 df.at[loc, 'REQDATE'] = po['reqdate']
-                df.at[loc, 'VENDOR_NUMBER'] = po['vendornum']
-                df.at[loc, 'RECIEVED_DATE'] = po['recdate']
-                df.at[loc, 'RECEIVED_AMOUNT'] = po['receivedamount']
-                df.at[loc, 'TOTITEMS_RECEIVED'] = po['totitemsreceived']
+                df.at[loc, 'VENDOR NUMBER'] = po['vendornum']
+                df.at[loc, 'RECIEVED DATE'] = po['recdate']
+                df.at[loc, 'RECEIVED AMOUNT'] = po['receivedamount']
+                df.at[loc, 'TOTITEMS RECEIVED'] = po['totitemsreceived']
                 # df.at[loc, 'ROW_UPDATED_TIME'] = datetime.utcnow()
-                df.at[loc, 'UNBILLED_RECEIVING'] = "Yes"
+                df.at[loc, 'UNBILLED RECEIVING'] = "Yes"
                 if (loc == index):
-                    df.at[loc, 'ON_STATEMENT'] = "No"
-                    df.at[loc, 'LOADED_NOT_PAID'] = "No"
+                    df.at[loc, 'ON STATEMENT'] = "No"
+                    df.at[loc, 'LOADED NOT PAID'] = "No"
 
             except:
                 # df.at[loc, 'ROW_UPDATED_TIME'] = datetime.utcnow()
                 df.at[loc, 'NOTES'] = 'UNKNOWN ERROR'
-                df.at[loc, 'UNBILLED_RECEIVING'] = "Yes"
+                df.at[loc, 'UNBILLED RECEIVING'] = "Yes"
                 if (loc == index):
-                    df.at[loc, 'ON_STATEMENT'] = "No"
-                    df.at[loc, 'LOADED_NOT_PAID'] = "No"
+                    df.at[loc, 'ON STATEMENT'] = "No"
+                    df.at[loc, 'LOADED NOT PAID'] = "No"
 
         # vouchers with no checks
         vouchers = misa.getvouchers_nocheck(customer)
@@ -290,29 +329,29 @@ def process_file(my_File, outgoing_url):
                     df.at[loc, 'PO_NUMBER'] = voucher['ponumber']
                 if voucher['Id']:
                     df.at[loc, 'INVOICENUMBER'] = voucher['Id']
-                df.at[loc, 'ANTICIPATED_CHECK_DATE'] = voucher['anticipatedcheckdate']
-                df.at[loc, 'RECEIVING_PO'] =  voucher['ponumber']
-                df.at[loc, 'VENDOR_NUMBER'] = voucher['vendorno']
-                df.at[loc, 'VENDOR_NAME'] = voucher['vendorname']
-                df.at[loc, 'INVOICE_DATE'] = voucher['invoicedate']
-                df.at[loc, 'INVOICE_AMOUNT'] = voucher['invoiceamount']
-                df.at[loc, 'MONTH_YEAR'] = voucher['monthyear']
-                df.at[loc, 'DATE_RECEIVED'] = voucher['datereceived']
+                df.at[loc, 'ANTICIPATED CHECK DATE'] = voucher['anticipatedcheckdate']
+                df.at[loc, 'RECEIVING PO'] =  voucher['ponumber']
+                df.at[loc, 'VENDOR NUMBER'] = voucher['vendorno']
+                df.at[loc, 'VENDOR NAME'] = voucher['vendorname']
+                df.at[loc, 'INVOICE DATE'] = voucher['invoicedate']
+                df.at[loc, 'INVOICE AMOUNT'] = voucher['invoiceamount']
+                df.at[loc, 'MONTH YEAR'] = voucher['monthyear']
+                df.at[loc, 'DATE RECEIVED'] = voucher['datereceived']
                 df.at[loc, 'DISCOUNT'] = voucher['discount']
-                df.at[loc, 'REQPAY_DATE'] = voucher['reqpaydate']
-                df.at[loc, 'BATCH_NUMBER'] = voucher['batchnumber']
+                df.at[loc, 'REQPAY DATE'] = voucher['reqpaydate']
+                df.at[loc, 'BATCH NUMBER'] = voucher['batchnumber']
                 # df.at[loc, 'ROW_UPDATED_TIME'] = datetime.utcnow()
-                df.at[loc, 'LOADED_NOT_PAID'] = "Yes"
+                df.at[loc, 'LOADED NOT PAID'] = "Yes"
                 if (loc == index):
-                    df.at[loc, 'UNBILLED_RECEIVING'] = "No"
-                    df.at[loc, 'ON_STATEMENT'] = "No"
+                    df.at[loc, 'UNBILLED RECEIVING'] = "No"
+                    df.at[loc, 'ON STATEMENT'] = "No"
             except:
                 # df.at[loc, 'ROW_UPDATED_TIME'] = datetime.utcnow()
                 df.at[loc, 'NOTES'] = 'UNKNOWN ERROR'
-                df.at[loc, 'LOADED_NOT_PAID'] = "Yes"
+                df.at[loc, 'LOADED NOT PAID'] = "Yes"
                 if (loc == index):
-                    df.at[loc, 'UNBILLED_RECEIVING'] = "No"
-                    df.at[loc, 'ON_STATEMENT'] = "No"
+                    df.at[loc, 'UNBILLED RECEIVING'] = "No"
+                    df.at[loc, 'ON STATEMENT'] = "No"
 
     else:
         data = ["INVALID CUSTOMER NAME"]
@@ -364,7 +403,7 @@ def process_file(my_File, outgoing_url):
             df['CHECK_DATE'] = pd.to_datetime(df['CHECK_DATE'],infer_datetime_format=False, format='%m/%d/%y', errors='ignore').dt.date
     except:
         pass
-    
+
     try:
         if 'ANTICIPATED_CHECK_DATE' in df:
             df['ANTICIPATED_CHECK_DATE'] = pd.to_datetime(df['ANTICIPATED_CHECK_DATE'],infer_datetime_format=False, format='%m/%d/%y', errors='ignore').dt.date
@@ -374,7 +413,7 @@ def process_file(my_File, outgoing_url):
     # print("\n ********************* OUTGOING ********************* ")
     # print(df.to_string())
 
-    spapi.put_dataframe_to_file(df, outgoing_url, customer + ".xlsx")
+    spapi.put_dataframe_to_file_formated(df, outgoing_url, customer + ".xlsx")
 
 
 
@@ -387,7 +426,7 @@ def lambda_handler(event, context):
     # check if records are passed in by event
     try:
         event
-        print(event)
+        # print(event)
     except NameError:
         event = None
 

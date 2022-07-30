@@ -6,3 +6,4 @@ requests
 xmltodict
 numpy
 boto3
+xlsxwriter
