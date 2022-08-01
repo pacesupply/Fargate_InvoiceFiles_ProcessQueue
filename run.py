@@ -90,7 +90,11 @@ class sharepoint:
             format = workbook.add_format({'text_wrap': True,
                                           'bold': True,
                                           'valign': 'top',
-                                          'align': 'center'})
+                                          'align': 'center',
+                                          'bg_color': '#E5FFE5',
+                                          'bottom': 1,
+                                          'right': 1,
+                                          'border_color': '#666666'})
 
             # worksheet.set_row(0, None, format)
 
@@ -131,7 +135,7 @@ class misapi:
         # self.baseurl = "http://pace-mis:9191/"
         self.baseurl = "http://mis-api-b.pacesupply.com:9191/"
 
-    def getvoucher(self, invoiceno, vendno):
+    def getvoucher(self, invoiceno, vendno, retryct=0):
         baseurl = self.baseurl
         endpoint = "pacehj/API.GET.VOUCHER.DETAIL/json/?invoiceno=" + str(invoiceno) + "&vendno=" + str(vendno)
         newbaseurl = "https://qlbimadsonxr7dcdf2nsd2cxbm0nzsll.lambda-url.us-west-1.on.aws/?url="
@@ -142,11 +146,16 @@ class misapi:
 
         headers = {"X-API-KEY": "None"}
         # response = requests.get(baseurl + endpoint, headers=headers)
-        response = requests.get(newbaseurl, headers=headers)
-        rjson = response.json()
-        return rjson['vouchers'][0]
+        response = requests.get(newbaseurl, headers=headers, timeout=60)
+        try:
+            rjson = response.json()
+        except:
+            print("error retrying {}".format(retryct))
+            if (retryct < 3):
+                return self.getvoucher(invoiceno, vendno, retryct+1)
+        return rjson['vouchers']
 
-    def getreceivedpos(self, vendno):
+    def getreceivedpos(self, vendno, retryct=0):
         baseurl = self.baseurl
         endpoint = "pacehj/API.GET.RECEIVEDPOS.BYVENDOR/json/?vendno=" + str(vendno)
         newbaseurl = "https://qlbimadsonxr7dcdf2nsd2cxbm0nzsll.lambda-url.us-west-1.on.aws/?url="
@@ -157,11 +166,17 @@ class misapi:
 
         headers = {"X-API-KEY": "None"}
         # response = requests.get(baseurl + endpoint, headers=headers)
-        response = requests.get(newbaseurl, headers=headers)
-        rjson = response.json()
+        response = requests.get(newbaseurl, headers=headers, timeout=60)
+        # rjson = response.json()
+        try:
+            rjson = response.json()
+        except:
+            print("error retrying {}".format(retryct))
+            if (retryct < 3):
+                return self.getreceivedpos(vendno, retryct+1)
         return rjson['purchaseorders']
 
-    def getvouchers_nocheck(self, vendno):
+    def getvouchers_nocheck(self, vendno, retryct=0):
         baseurl = self.baseurl
         endpoint = "pacehj/API.GET.VOUCHER.NOCHECK/json/?vendno=" + str(vendno)
         newbaseurl = "https://qlbimadsonxr7dcdf2nsd2cxbm0nzsll.lambda-url.us-west-1.on.aws/?url="
@@ -172,8 +187,14 @@ class misapi:
 
         headers = {"X-API-KEY": "None"}
         # response = requests.get(baseurl + endpoint, headers=headers)
-        response = requests.get(newbaseurl, headers=headers)
-        rjson = response.json()
+        response = requests.get(newbaseurl, headers=headers, timeout=60)
+        # rjson = response.json()
+        try:
+            rjson = response.json()
+        except:
+            print("error retrying {}".format(retryct))
+            if (retryct < 3):
+                return self.getvouchers_nocheck(vendno, retryct+1)
         return rjson['vouchers']
 
 
@@ -237,12 +258,21 @@ def process_file(my_File, outgoing_url):
         # print("\n\n *********** INCOMING ({}) ************** ".format(os.path.basename(my_File)))
         # print(df.to_string())
 
+        extravouchers = []
         index = -1
         for index, row in df.iterrows():
 
-            try:
-                data = misa.getvoucher(row['INVOICENUMBER'], customer)
+            data = misa.getvoucher(row['INVOICENUMBER'] + "]", customer)
 
+            # print(len(data))
+            if len(data) == 0:
+                # df.at[index, 'ROW_UPDATED_TIME'] = datetime.utcnow()
+                df.at[index, 'NOTES'] = 'INVOICE NOT FOUND'
+                df.at[index, 'ON STATEMENT'] = "Yes"
+                df.at[index, 'UNBILLED RECEIVING'] = "No"
+                df.at[index, 'LOADED NOT PAID'] = "No"
+            elif len(data) == 1:
+                data = data[0]
                 df.at[index, 'VENDOR NUMBER'] = data['vendorno']
                 df.at[index, 'ON STATEMENT'] = "Yes"
                 df.at[index, 'UNBILLED RECEIVING'] = "No"
@@ -260,13 +290,54 @@ def process_file(my_File, outgoing_url):
                 df.at[index, 'RECEIVING PO'] = data['ponumber']
                 df.at[index, 'BATCH NUMBER'] = data['batchnumber']
                 # df.at[index, 'ROW_UPDATED_TIME'] = datetime.utcnow()
-
-            except:
-                # df.at[index, 'ROW_UPDATED_TIME'] = datetime.utcnow()
-                df.at[index, 'NOTES'] = 'INVOICE NOT FOUND'
+            else:
                 df.at[index, 'ON STATEMENT'] = "Yes"
-                df.at[index, 'UNBILLED RECEIVING'] = "No"
-                df.at[index, 'LOADED NOT PAID'] = "No"
+                for voucher in data:
+                    voucher['statementinvoice'] = row['INVOICENUMBER']
+
+                    x = voucher['Id'].split(row['INVOICENUMBER'])
+                    if len(x) == 2:
+                        y = x[1]
+                        if len(y) == 1 and not(y.isnumeric()):
+                            extravouchers.append(voucher)
+
+        for voucher in extravouchers:
+
+            y = df.index[df['INVOICENUMBER'] == voucher['Id']].tolist()
+
+            if y and y[0]:
+                loc = y[0]
+            else:
+                index = index + 1
+                loc = index
+
+            z = df.index[df['INVOICENUMBER'] == voucher['statementinvoice']].tolist()
+            if z and z[0]:
+                loc = z[0] + .5
+
+            # line = DataFrame({"onset": 30.0, "length": 1.3}, index=[3])
+            # df2 = concat([df.iloc[:2], line, df.iloc[2:]]).reset_index(drop=True)
+
+            df.at[loc, 'INVOICENUMBER'] = voucher['Id']
+            df.at[loc, 'VENDOR NUMBER'] = voucher['vendorno']
+            df.at[loc, 'ON STATEMENT'] = "Split"
+            df.at[loc, 'UNBILLED RECEIVING'] = "No"
+            df.at[loc, 'LOADED NOT PAID'] = "No"
+            df.at[loc, 'CHECK NUMBER'] = voucher['checknumber']
+            df.at[loc, 'CHECK DATE'] = voucher['checkdate']
+            df.at[loc, 'ANTICIPATED CHECK DATE'] = voucher['anticipatedcheckdate']
+            df.at[loc, 'VENDOR NAME'] = voucher['vendorname']
+            df.at[loc, 'INVOICE DATE'] = voucher['invoicedate']
+            df.at[loc, 'INVOICE AMOUNT'] = voucher['invoiceamount']
+            df.at[loc, 'MONTH YEAR'] = voucher['monthyear']
+            df.at[loc, 'DATE RECEIVED'] = voucher['datereceived']
+            df.at[loc, 'DISCOUNT'] = voucher['discount']
+            df.at[loc, 'REQPAY DATE'] = voucher['reqpaydate']
+            df.at[loc, 'RECEIVING PO'] = voucher['ponumber']
+            df.at[loc, 'BATCH NUMBER'] = voucher['batchnumber']
+
+            df = df.sort_index().reset_index(drop=True)
+
 
         #see if prices of changed
         #df = add_price_match(df, outgoing_url, customer, spapi)
