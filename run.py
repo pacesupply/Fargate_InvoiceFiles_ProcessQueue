@@ -305,14 +305,14 @@ def process_file(my_File, outgoing_url):
 
             y = df.index[df['INVOICENUMBER'] == voucher['Id']].tolist()
 
-            if y and y[0]:
+            if y:
                 loc = y[0]
             else:
                 index = index + 1
                 loc = index
 
             z = df.index[df['INVOICENUMBER'] == voucher['statementinvoice']].tolist()
-            if z and z[0]:
+            if z:
                 loc = z[0] + .5
 
             # line = DataFrame({"onset": 30.0, "length": 1.3}, index=[3])
@@ -348,7 +348,7 @@ def process_file(my_File, outgoing_url):
 
             x = df.index[df['PO_NUMBER'] == po['Id']].tolist()
 
-            if x and x[0]:
+            if x:
                 loc = x[0]
             else:
                 index = index + 1
@@ -387,9 +387,9 @@ def process_file(my_File, outgoing_url):
             x = df.index[df['PO_NUMBER'] == voucher['ponumber']].tolist()
             y = df.index[df['INVOICENUMBER'] == voucher['Id']].tolist()
 
-            if x and x[0]:
+            if x:
                 loc = x[0]
-            elif y and y[0]:
+            elif y:
                 loc = y[0]
             else:
                 index = index + 1
