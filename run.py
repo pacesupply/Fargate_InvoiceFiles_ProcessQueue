@@ -144,7 +144,7 @@ class misapi:
         newbaseurl = newbaseurl + urllib.parse.quote(baseurl + endpoint, safe='')
         # print(newbaseurl)
 
-        headers = {"X-API-KEY": "None"}
+        headers = {"X-API-KEY": "None", "x-token": "MGOFCW6FaR86KHAQWidDoEKkeV9BOzst"}
         # response = requests.get(baseurl + endpoint, headers=headers)
         response = requests.get(newbaseurl, headers=headers, timeout=60)
         try:
@@ -164,7 +164,7 @@ class misapi:
         newbaseurl = newbaseurl + urllib.parse.quote(baseurl + endpoint, safe='')
         # print(newbaseurl)
 
-        headers = {"X-API-KEY": "None"}
+        headers = {"X-API-KEY": "None", "x-token": "MGOFCW6FaR86KHAQWidDoEKkeV9BOzst"}
         # response = requests.get(baseurl + endpoint, headers=headers)
         response = requests.get(newbaseurl, headers=headers, timeout=60)
         # rjson = response.json()
@@ -185,7 +185,7 @@ class misapi:
         newbaseurl = newbaseurl + urllib.parse.quote(baseurl + endpoint, safe='')
         # print(newbaseurl)
 
-        headers = {"X-API-KEY": "None"}
+        headers = {"X-API-KEY": "None", "x-token": "MGOFCW6FaR86KHAQWidDoEKkeV9BOzst"}
         # response = requests.get(baseurl + endpoint, headers=headers)
         response = requests.get(newbaseurl, headers=headers, timeout=60)
         # rjson = response.json()
